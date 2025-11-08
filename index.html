@@ -1,0 +1,114 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Particle Shower Simulator</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="overlay">
+      <div class="overlay-header">
+        <h1>Particle Shower Observatory</h1>
+        <button id="infoToggle" class="info-toggle" aria-expanded="true">
+          Hide intro
+        </button>
+      </div>
+      <p id="overlayDescription">
+        Trace the cascade of high-energy primaries as they slalom through a
+        stylized atmosphere. Protons and ionic nuclei convert their energy into
+        pions and muons, while gamma rays pair-produce electrons and positrons.
+        Each interaction obeys probabilistic rules derived from those seen in
+        experimental air-shower detectors, so every burst feels unique.
+      </p>
+      <div class="controls">
+        <label class="control">
+          <span>Primary type</span>
+          <select id="primaryType">
+            <option value="proton">Proton</option>
+            <option value="gamma">Gamma</option>
+            <option value="iron">Iron nucleus</option>
+          </select>
+        </label>
+        <label class="control">
+          <span>Primary energy multiplier <strong id="energyValue">2.0</strong></span>
+          <input id="energyRange" type="range" min="0.8" max="8.0" step="0.1" value="2.0" />
+        </label>
+        <label class="control">
+          <span>Interaction drive <strong id="driveValue">1.0</strong></span>
+          <input id="driveRange" type="range" min="0.3" max="1.7" step="0.05" value="1.0" />
+        </label>
+        <label class="control">
+          <span>Primaries per second <strong id="rateValue">0.7</strong></span>
+          <input id="rateRange" type="range" min="0.2" max="3.0" step="0.05" value="0.7" />
+        </label>
+        <label class="control toggle-control">
+          <span>Cascade mode</span>
+          <div class="toggle-track">
+            <input type="checkbox" id="cascadeToggle" />
+            <span class="toggle-thumb"></span>
+            <span class="toggle-label" id="cascadeLabel">off</span>
+          </div>
+        </label>
+      </div>
+      <div class="buttons">
+        <button id="burstButton">Fire single primary</button>
+        <button id="clearButton">Clear sky</button>
+      </div>
+      <div class="hit-controls">
+        <label class="control toggle-control">
+          <span>Floor hits</span>
+          <div class="toggle-track">
+            <input type="checkbox" id="hitToggle" checked />
+            <span class="toggle-thumb"></span>
+            <span class="toggle-label" id="hitLabel">on</span>
+          </div>
+        </label>
+        <button id="clearHits">Clear hits</button>
+      </div>
+      <div id="statusBoard">
+        <div class="stat-line">
+          <span>Active particles</span><span id="particleCount">0</span>
+        </div>
+        <div class="stat-line stat-proton">
+          <span>Protons</span><span id="stat-proton">0</span>
+        </div>
+        <div class="stat-line stat-gamma">
+          <span>Gammas</span><span id="stat-gamma">0</span>
+        </div>
+        <div class="stat-line stat-pion">
+          <span>Pions</span><span id="stat-pion">0</span>
+        </div>
+        <div class="stat-line stat-muon">
+          <span>Muons</span><span id="stat-muon">0</span>
+        </div>
+        <div class="stat-line stat-electron">
+          <span>Electrons</span><span id="stat-electron">0</span>
+        </div>
+        <div class="stat-line stat-positron">
+          <span>Positrons</span><span id="stat-positron">0</span>
+        </div>
+        <div class="stat-line stat-neutrino">
+          <span>Neutrinos</span><span id="stat-neutrino">0</span>
+        </div>
+        <div class="stat-line stat-iron">
+          <span>Iron nuclei</span><span id="stat-iron">0</span>
+        </div>
+      </div>
+    </div>
+    <div id="miniAxis">
+      <div class="mini-axis-title">Vertical scale</div>
+      <canvas id="axisCanvas" width="150" height="180"></canvas>
+      <div class="mini-axis-medium">Medium: Thin air / upper atmosphere</div>
+    </div>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+          "three/": "https://cdn.jsdelivr.net/npm/three@0.152.2/"
+        }
+      }
+    </script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
