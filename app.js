@@ -2,11 +2,13 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000014);
-scene.fog = new THREE.FogExp2(0x000011, 0.003);
+scene.background = new THREE.Color(0x090a14);
+scene.fog = new THREE.FogExp2(0x030347, 0.003);
 
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 420);
+camera.far = 5000;
 camera.position.set(0, 22, 90);
+camera.updateProjectionMatrix();
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -29,16 +31,16 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.1);
 sun.position.set(28, 60, 22);
 scene.add(sun);
 
-const grid = new THREE.GridHelper(260, 36, 0x0a1230, 0x071022);
+const grid = new THREE.GridHelper(260, 36, 0x0a1230, 0x051015);
 grid.position.y = -12;
 scene.add(grid);
 
 const ground = new THREE.Mesh(
-  new THREE.CircleGeometry(180, 64),
+  new THREE.CircleGeometry(4000, 64),
   new THREE.MeshBasicMaterial({
     color: 0x050a16,
     transparent: true,
-    opacity: 0.7,
+    opacity: 0.3,
     side: THREE.DoubleSide,
   }),
 );
@@ -96,18 +98,18 @@ class Particle {
     return (
       this.position.y < -18 ||
       this.age > lifetimeMap[this.type] ||
-      this.energy < 0.005
+      this.energy < 0.0005  //arbitrary, so keep very low
     );
   }
 }
 
-const maxParticles = 4200;
+const maxParticles = 16000;
 const particles = [];
 const positions = new Float32Array(maxParticles * 3);
 const colors = new Float32Array(maxParticles * 3);
 const energies = new Float32Array(maxParticles);
 
-const maxHits = 2400;
+const maxHits = 8000;
 const hitPositions = new Float32Array(maxHits * 3);
 const hitColors = new Float32Array(maxHits * 3);
 
@@ -145,7 +147,7 @@ particleTexture.needsUpdate = true;
 const particleMaterial = new THREE.ShaderMaterial({
   uniforms: {
     pointTexture: { value: particleTexture },
-    size: { value: 4 },
+    size: { value: 3 },
   },
   vertexShader: `
     uniform float size;
@@ -169,7 +171,7 @@ const particleMaterial = new THREE.ShaderMaterial({
     void main() {
       vec4 tex = texture(pointTexture, gl_PointCoord);
       if (tex.a < 0.05) discard;
-      float alpha = mix(0.28, 2.0, vEnergy);
+      float alpha = mix(0.18, 3.0, vEnergy);
       gl_FragColor = vec4(vColor, alpha) * tex;
     }
   `,
@@ -196,7 +198,7 @@ hitGeometry.setDrawRange(0, 0);
 const hitMaterial = new THREE.ShaderMaterial({
   uniforms: {
     pointTexture: { value: particleTexture },
-    size: { value: 6 },
+    size: { value: 4 },
   },
   vertexShader: `
     uniform float size;
