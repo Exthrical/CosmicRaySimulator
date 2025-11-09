@@ -103,13 +103,13 @@ class Particle {
   }
 }
 
-const maxParticles = 16000;
+const maxParticles = 20000;
 const particles = [];
 const positions = new Float32Array(maxParticles * 3);
 const colors = new Float32Array(maxParticles * 3);
 const energies = new Float32Array(maxParticles);
 
-const maxHits = 8000;
+const maxHits = 32000;
 const hitPositions = new Float32Array(maxHits * 3);
 const hitColors = new Float32Array(maxHits * 3);
 
@@ -400,10 +400,11 @@ function trimParticles() {
   particles.splice(0, particles.length - maxParticles);
 }
 
-function maybeBranch(particle, collector) {
+function maybeBranch(particle, collector, delta) {
   const drive = parseFloat(driveRange.value);
   const baseProbability = 0.02 * drive + 0.015 * Math.min(particle.energy, 3);
-  if (Math.random() > baseProbability) return;
+  const chance = Math.min(1, baseProbability * delta);
+  if (Math.random() > chance) return;
   const heightModifier = Math.max(0, Math.min(1, (particle.position.y + 20) / 90));
   if (Math.random() > 0.7 + 0.3 * heightModifier) return;
 
@@ -478,7 +479,7 @@ function updateParticles(delta) {
   for (let i = particles.length - 1; i >= 0; i -= 1) {
     const particle = particles[i];
     particle.update(delta);
-    maybeBranch(particle, newParticles);
+    maybeBranch(particle, newParticles, delta);
     const shouldDie = particle.shouldExpire();
     const hitFloor = particle.position.y < -18;
     if (shouldDie) {
