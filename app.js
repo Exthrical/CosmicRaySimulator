@@ -103,13 +103,13 @@ class Particle {
   }
 }
 
-const maxParticles = 20000;
+const maxParticles = 256000;
 const particles = [];
 const positions = new Float32Array(maxParticles * 3);
 const colors = new Float32Array(maxParticles * 3);
 const energies = new Float32Array(maxParticles);
 
-const maxHits = 32000;
+const maxHits = 80000;
 const hitPositions = new Float32Array(maxHits * 3);
 const hitColors = new Float32Array(maxHits * 3);
 
@@ -400,30 +400,50 @@ function trimParticles() {
   particles.splice(0, particles.length - maxParticles);
 }
 
-function maybeBranch(particle, collector, delta) {
+function maybeBranch(particle, collector) {
   const drive = parseFloat(driveRange.value);
   const baseProbability = 0.02 * drive + 0.015 * Math.min(particle.energy, 3);
-  const chance = Math.min(1, baseProbability * delta);
-  if (Math.random() > chance) return;
+  if (Math.random() > baseProbability) return;
   const heightModifier = Math.max(0, Math.min(1, (particle.position.y + 20) / 90));
   if (Math.random() > 0.7 + 0.3 * heightModifier) return;
 
+  // Electromagnetic shower suppression at low altitude
+  const altitudeFactor = Math.max(0, (particle.position.y + 10) / 80);
+  
   switch (particle.type) {
-    case "proton":
-    case "iron": {
+    case "proton": {
       if (particle.age < 0.2) return;
+      // Proton produces mainly pions
       collector.push(createParticle("pion", particle.position, particle.energy * 0.7, { scatter: 0.4 }));
       collector.push(createParticle("pion", particle.position, particle.energy * 0.45, { scatter: 0.65 }));
-      if (Math.random() < 0.5) {
+      // Fewer gammas from protons
+      if (Math.random() < 0.25) {
         collector.push(...createPair(particle, "gamma", "gamma"));
       }
-      if (particle.type === "iron" && Math.random() < 0.4) {
-        collector.push(createParticle("muon", particle.position, particle.energy * 0.4, { scatter: 0.5, speed: 20 }));
+      break;
+    }
+    case "iron": {
+      if (particle.age < 0.15) return;
+      // Iron fragments create a MUCH wider shower
+      const fragments = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < fragments; i++) {
+        collector.push(createParticle("pion", particle.position, particle.energy * 0.5, { scatter: 1.2 }));
+      }
+      // Iron produces more muons
+      if (Math.random() < 0.7) {
+        collector.push(createParticle("muon", particle.position, particle.energy * 0.5, { scatter: 0.8, speed: 20 }));
+        collector.push(createParticle("muon", particle.position, particle.energy * 0.4, { scatter: 0.9, speed: 18 }));
+      }
+      // Some proton fragments
+      if (Math.random() < 0.5) {
+        collector.push(createParticle("proton", particle.position, particle.energy * 0.4, { scatter: 0.9 }));
       }
       break;
     }
     case "gamma": {
-      if (Math.random() < 0.55) {
+      // Suppress electromagnetic cascade at low altitude
+      const emProb = 0.35 * altitudeFactor;
+      if (Math.random() < emProb) {
         collector.push(...createPair(particle, "electron", "positron"));
       }
       break;
@@ -452,7 +472,9 @@ function maybeBranch(particle, collector, delta) {
     }
     case "electron":
     case "positron": {
-      if (Math.random() < 0.3) {
+      // Strongly suppress at low altitude
+      const emProb = 0.18 * altitudeFactor;
+      if (Math.random() < emProb) {
         collector.push(createParticle("gamma", particle.position, particle.energy * 0.3, { scatter: 0.6, upwardBias: 0.1 }));
       }
       break;
