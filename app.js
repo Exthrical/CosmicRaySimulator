@@ -237,6 +237,7 @@ scene.add(hitCloud);
 const clock = new THREE.Clock();
 let spawnAccumulator = 0;
 
+const pauseButton = document.getElementById("pauseButton");
 const primaryTypeSelect = document.getElementById("primaryType");
 const energyRange = document.getElementById("energyRange");
 const driveRange = document.getElementById("driveRange");
@@ -276,11 +277,17 @@ function createParticle(type, origin, energy, options = {}) {
   const scatter = options.scatter ?? 0.45;
   const upwardBias = options.upwardBias ?? 0;
   const baseSpeed = options.speed ?? 16;
+  
+  // Lateral spread increases with depth (Molière radius)
+  const depth = (80 - origin.y) / 80; // 0 at top, 1 at ground
+  const lateralSpread = scatter * (1 + depth * 2); // Widens as it descends
+  
   const direction = new THREE.Vector3(
-    (Math.random() - 0.5) * scatter,
+    (Math.random() - 0.5) * lateralSpread,
     -1 + upwardBias,
-    (Math.random() - 0.5) * scatter,
+    (Math.random() - 0.5) * lateralSpread,
   ).normalize();
+  
   const speed = baseSpeed + energy * 5;
   const velocity = direction.multiplyScalar(speed);
   const position = origin.clone();
@@ -352,6 +359,13 @@ function spawnPrimary(type) {
   particles.push(primary);
 }
 
+// pause setup
+let isPaused = false;
+pauseButton.addEventListener("click", () => {
+  isPaused = !isPaused;  // Flip it: true→false or false→true
+  pauseButton.textContent = isPaused ? "Resume" : "Pause";  // Update button text
+});
+
 burstButton.addEventListener("click", () => spawnPrimary(primaryTypeSelect.value));
 let cascadeActive = false;
 cascadeToggle.addEventListener("change", () => {
@@ -402,10 +416,25 @@ function trimParticles() {
 
 function maybeBranch(particle, collector) {
   const drive = parseFloat(driveRange.value);
-  const baseProbability = 0.02 * drive + 0.015 * Math.min(particle.energy, 3);
+
+  const energyMultiplier = {
+    proton: 1.0 * (drive/5.0),
+    iron: 2.0 * (drive/5.0),
+    gamma: 20.0 * (Math.pow(drive, 0.2)/5.0),       // ← Gammas are more sensitive to energy
+    electron: 2.0 * (drive/5.0),
+    positron: 2.0 * (drive/5.0),
+    pion: 0.9 * (drive/5.0),
+    muon: 0.5 * (drive/5.0),        // ← Muons barely respond to energy
+    neutrino: 0.1 * (drive/5.0)
+  };
+  
+  const mult = energyMultiplier[particle.type] || 1.0;
+  const baseProbability = 0.02 * drive + mult * 0.02 * Math.min(particle.energy, 8.0);
+
   if (Math.random() > baseProbability) return;
   const heightModifier = Math.max(0, Math.min(1, (particle.position.y + 20) / 90));
   if (Math.random() > 0.7 + 0.3 * heightModifier) return;
+  
 
   // Electromagnetic shower suppression at low altitude
   const altitudeFactor = Math.max(0, (particle.position.y + 10) / 80);
@@ -415,9 +444,10 @@ function maybeBranch(particle, collector) {
       if (particle.age < 0.2) return;
       // Proton produces mainly pions
       collector.push(createParticle("pion", particle.position, particle.energy * 0.7, { scatter: 0.4 }));
+      collector.push(createParticle("pion", particle.position, particle.energy * 0.6, { scatter: 0.5 }));
       collector.push(createParticle("pion", particle.position, particle.energy * 0.45, { scatter: 0.65 }));
       // Fewer gammas from protons
-      if (Math.random() < 0.25) {
+      if (Math.random() < 0.1) {
         collector.push(...createPair(particle, "gamma", "gamma"));
       }
       break;
@@ -449,7 +479,7 @@ function maybeBranch(particle, collector) {
       break;
     }
     case "pion": {
-      if (Math.random() < 0.65) {
+      if (Math.random() < 0.85) {
         collector.push(
           createParticle("muon", particle.position, particle.energy * 0.7, { scatter: 0.25, speed: 19 }),
         );
@@ -628,9 +658,17 @@ function onResize() {
 window.addEventListener("resize", onResize);
 
 function animate() {
-  const delta = Math.min(clock.getDelta(), 0.045);
+  // always call or delta accumulate
+  const rawDelta = clock.getDelta();
+  
   controls.update();
-  updateParticles(delta);
+  
+  // dont call if paused
+  if (!isPaused) {
+    const delta = Math.min(rawDelta, 0.045);
+    updateParticles(delta);
+  }
+  
   refreshPointCloud();
   updateStats();
   drawAxisMini();
