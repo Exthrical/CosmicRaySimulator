@@ -379,3 +379,33 @@ button:hover {
     margin: 1rem auto;
   }
 }
+
+/* Mobile: collapse to bottom or make scrollable */
+@media (max-width: 768px) {
+  .controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+    max-height: 40vh;
+    overflow-y: auto;
+    flex-direction: row; /* Horizontal layout */
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+  
+  .control-group {
+    flex: 1 1 45%; /* Two columns */
+    min-width: 150px;
+  }
+  
+  button {
+    min-height: 44px; /* Apple's touch target size */
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+  
+  #axisCanvas {
+    display: none; /* Hide mini-map on mobile to save space */
+  }
+}
