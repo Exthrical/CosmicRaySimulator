@@ -363,7 +363,7 @@ function spawnPrimary(type) {
 let isPaused = false;
 pauseButton.addEventListener("click", () => {
   isPaused = !isPaused;  // Flip it: true→false or false→true
-  pauseButton.textContent = isPaused ? "Resume" : "Pause";  // Update button text
+  pauseButton.textContent = isPaused ? "▶ Play" : "⏸ Pause";  // Icon + text
 });
 
 burstButton.addEventListener("click", () => spawnPrimary(primaryTypeSelect.value));
@@ -409,6 +409,25 @@ infoToggle?.addEventListener("click", () => {
   infoToggle.setAttribute("aria-expanded", descriptionVisible ? "true" : "false");
 });
 
+window.addEventListener("keydown", (event) => {
+  // Spacebar toggles pause
+  if (event.code === "Space" || event.key === " ") {
+    event.preventDefault(); // Prevent page scroll
+    isPaused = !isPaused;
+    if (pauseButton) {
+      pauseButton.textContent = isPaused ? "▶ Play" : "⏸ Pause";
+    }
+  } else if (event.key === "r" || event.key === "R" ) {
+    // Clear all on r
+    event.preventDefault(); // Prevent page scroll
+    particles.length = 0;
+    hitCount = 0;
+    hitGeometry.setDrawRange(0, 0);
+    hitGeometry.attributes.position.needsUpdate = true;
+    hitGeometry.attributes.color.needsUpdate = true;
+  }
+});
+
 function trimParticles() {
   if (particles.length <= maxParticles) return;
   particles.splice(0, particles.length - maxParticles);
@@ -420,7 +439,7 @@ function maybeBranch(particle, collector) {
   const energyMultiplier = {
     proton: 1.0 * (drive/5.0),
     iron: 2.0 * (drive/5.0),
-    gamma: 20.0 * (Math.pow(drive, 0.2)/5.0),       // ← Gammas are more sensitive to energy
+    gamma: 15.0 * (Math.pow(drive, 0.2)/5.0),       // ← Gammas are more sensitive to energy
     electron: 2.0 * (drive/5.0),
     positron: 2.0 * (drive/5.0),
     pion: 0.9 * (drive/5.0),
@@ -472,7 +491,7 @@ function maybeBranch(particle, collector) {
     }
     case "gamma": {
       // Suppress electromagnetic cascade at low altitude
-      const emProb = 0.35 * altitudeFactor;
+      const emProb = 0.25 * altitudeFactor;
       if (Math.random() < emProb) {
         collector.push(...createPair(particle, "electron", "positron"));
       }
@@ -484,7 +503,7 @@ function maybeBranch(particle, collector) {
           createParticle("muon", particle.position, particle.energy * 0.7, { scatter: 0.25, speed: 19 }),
         );
         collector.push(
-          createParticle("neutrino", particle.position, particle.energy * 0.2, { scatter: 0.4, upwardBias: 0.3, speed: 16 }),
+          createParticle("neutrino", particle.position, particle.energy * 0.2, { scatter: 0.4, upwardBias: 0.4, speed: 16 }),
         );
       }
       break;
@@ -495,7 +514,8 @@ function maybeBranch(particle, collector) {
           createParticle("electron", particle.position, particle.energy * 0.5, { scatter: 0.35, speed: 14 }),
         );
         collector.push(
-          createParticle("neutrino", particle.position, particle.energy * 0.15, { scatter: 0.5, upwardBias: 0.3, speed: 16 }),
+          //nearly isotropic
+          createParticle("neutrino", particle.position, particle.energy * 0.15, { scatter: 0.5, upwardBias: Math.random() * 1.4 - 0.2, speed: 16 }),
         );
       }
       break;
