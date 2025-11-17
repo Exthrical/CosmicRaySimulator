@@ -372,40 +372,57 @@ button:hover {
   letter-spacing: 0.2px;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 820px) {
   #overlay {
-    width: calc(100vw - 2rem);
-    position: relative;
-    margin: 1rem auto;
-  }
-}
-
-/* Mobile: collapse to bottom or make scrollable */
-@media (max-width: 768px) {
-  .controls {
+    width: min(360px, calc(100vw - 2rem));
     position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: auto;
-    max-height: 40vh;
+    left: 50%;
+    top: 1rem;
+    transform: translateX(-50%);
+    max-height: 80vh;
     overflow-y: auto;
-    flex-direction: row; /* Horizontal layout */
-    flex-wrap: wrap;
-    padding: 12px;
+    padding: 1rem;
   }
-  
-  .control-group {
-    flex: 1 1 45%; /* Two columns */
-    min-width: 150px;
+
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.5rem;
   }
-  
-  button {
-    min-height: 44px; /* Apple's touch target size */
-    font-size: 16px; /* Prevents iOS zoom on focus */
+
+  .control {
+    min-width: 0;
   }
-  
+
+  .buttons,
+  .hit-controls {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .buttons button,
+  .hit-controls button {
+    width: 100%;
+  }
+
+  .hit-controls {
+    gap: 0.4rem;
+  }
+
+  #statusBoard {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+
   #axisCanvas {
-    display: none; /* Hide mini-map on mobile to save space */
+    display: none;
+  }
+
+  #miniAxis {
+    display: none;
+  }
+
+  button {
+    min-height: 44px;
+    font-size: 0.95rem;
   }
 }
