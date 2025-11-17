@@ -385,13 +385,23 @@ button:hover {
   }
 
   .controls {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
   }
 
   .control {
     min-width: 0;
+    gap: 0.5rem;
+  }
+  
+  .control strong {
+    display: block;
+  }
+
+  input[type="range"] {
+    margin-top: 0.4rem;
+    margin-bottom: 0.4rem;
   }
 
   .buttons,
@@ -407,22 +417,31 @@ button:hover {
 
   .hit-controls {
     gap: 0.4rem;
+    margin-top: 0.8rem;
   }
 
   #statusBoard {
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.4rem 0.6rem;
+    margin-top: 0.8rem;
   }
 
   #axisCanvas {
-    display: none;
+    display: none !important;
   }
 
   #miniAxis {
-    display: none;
+    display: none !important;
   }
 
   button {
     min-height: 44px;
     font-size: 0.95rem;
+    padding: 0.65rem 0.85rem;
+  }
+  
+  /* Ensure touch-friendly toggles */
+  .toggle-control {
+    padding: 0.3rem 0;
   }
 }
