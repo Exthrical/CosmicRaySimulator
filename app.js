@@ -419,7 +419,6 @@ window.addEventListener("keydown", (event) => {
     }
   } else if (event.key === "r" || event.key === "R" ) {
     // Clear all on r
-    event.preventDefault(); // Prevent page scroll
     particles.length = 0;
     hitCount = 0;
     hitGeometry.setDrawRange(0, 0);
