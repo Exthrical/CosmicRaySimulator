@@ -29,7 +29,8 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.5);
 sun.position.set(20, 80, 50);
 scene.add(sun);
 
-const grid = new THREE.GridHelper(400, 40, 0x440000, 0x111111);
+const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent-primary")
+const grid = new THREE.GridHelper(400, 40, accent, 0x111111);
 grid.position.y = -20;
 scene.add(grid);
 
@@ -535,7 +536,7 @@ function drawAxisMini() {
   axisCtx.fillRect(0, 0, width, height);
 
   const centerX = width * 0.3;
-  axisCtx.strokeStyle = "rgba(255,88,88,0.45)";
+  axisCtx.strokeStyle = accent;
   axisCtx.lineWidth = 1;
   axisCtx.beginPath();
   axisCtx.moveTo(centerX, 4);
