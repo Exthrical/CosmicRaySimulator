@@ -1,115 +1,144 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Particle Shower Simulator</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <div id="overlay">
-      <div class="overlay-header">
-        <h1>Particle Shower Observatory</h1>
-        <button id="infoToggle" class="info-toggle" aria-expanded="true">
-          Hide intro
-        </button>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>A.E.T.H.E.R // Ray Tracing</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+
+  <div id="ui-layer">
+    
+    <header class="hud-header">
+      <div class="brand">
+        <span class="icon">?</span>
+        <div class="title-stack">
+          <h1>A.E.T.H.E.R.</h1>
+          <small>ATMOSPHERIC ENTRY TRACKING // HIGH ENERGY RAY</small>
+        </div>
       </div>
-      <p id="overlayDescription">
-        Trace the cascade of high-energy primaries as they slalom through a
-        stylized atmosphere. Protons and ionic nuclei convert their energy into
-        pions and muons, while gamma rays pair-produce electrons and positrons.
-        Each interaction obeys probabilistic rules derived from those seen in
-        experimental air-shower detectors, so every burst feels unique.
-      </p>
-      <div class="controls">
-        <label class="control">
-          <span>Primary type</span>
+      <div class="system-status">
+        <span class="blink">SYSTEM ONLINE</span>
+        <span class="time" id="sysTime">00:00:00</span>
+      </div>
+    </header>
+
+    <aside class="hud-panel left-panel">
+      <div class="panel-header">Config // Primary</div>
+      
+      <div class="control-group">
+        <label>Particle Class</label>
+        <div class="select-wrapper">
           <select id="primaryType">
-            <option value="proton">Proton</option>
-            <option value="gamma">Gamma</option>
-            <option value="iron">Iron nucleus</option>
+            <option value="proton">PROTON [H+]</option>
+            <option value="gamma">GAMMA [?]</option>
+            <option value="iron">IRON [Fe-56]</option>
+            <option value="tau">TAU [tau]</option>
+            <option value="antiproton">ANTI-PROTON [p-]</option>
           </select>
-        </label>
-        <label class="control">
-          <span>Primary energy multiplier <strong id="energyValue">3.0</strong></span>
-          <input id="energyRange" type="range" min="0.8" max="16.0" step="0.1" value="3.0" />
-        </label>
-        <label class="control">
-          <span>Interaction drive <strong id="driveValue">5.0</strong></span>
-          <input id="driveRange" type="range" min="0.0" max="12.0" step="0.05" value="5.0" />
-        </label>
-        <label class="control">
-          <span>Primaries per second <strong id="rateValue">0.7</strong></span>
-          <input id="rateRange" type="range" min="0.2" max="3.0" step="0.05" value="0.7" />
-        </label>
-        <label class="control toggle-control">
-          <span>Cascade mode</span>
-          <div class="toggle-track">
-            <input type="checkbox" id="cascadeToggle" />
-            <span class="toggle-thumb"></span>
-            <span class="toggle-label" id="cascadeLabel">off</span>
-          </div>
-        </label>
-      </div>
-      <div class="buttons">
-        <button id="burstButton">Fire single primary</button>
-        <button id="pauseButton">⏸ Pause</button>
-        <button id="clearButton">Clear sky</button>
-      </div>
-      <div class="hit-controls">
-        <label class="control toggle-control">
-          <span>Floor hits</span>
-          <div class="toggle-track">
-            <input type="checkbox" id="hitToggle" checked />
-            <span class="toggle-thumb"></span>
-            <span class="toggle-label" id="hitLabel">on</span>
-          </div>
-        </label>
-        <button id="clearHits">Clear hits</button>
-      </div>
-      <div id="statusBoard">
-        <div class="stat-line">
-          <span>Active particles</span><span id="particleCount">0</span>
-        </div>
-        <div class="stat-line stat-proton">
-          <span>Protons</span><span id="stat-proton">0</span>
-        </div>
-        <div class="stat-line stat-gamma">
-          <span>Gammas</span><span id="stat-gamma">0</span>
-        </div>
-        <div class="stat-line stat-pion">
-          <span>Pions</span><span id="stat-pion">0</span>
-        </div>
-        <div class="stat-line stat-muon">
-          <span>Muons</span><span id="stat-muon">0</span>
-        </div>
-        <div class="stat-line stat-electron">
-          <span>Electrons</span><span id="stat-electron">0</span>
-        </div>
-        <div class="stat-line stat-positron">
-          <span>Positrons</span><span id="stat-positron">0</span>
-        </div>
-        <div class="stat-line stat-neutrino">
-          <span>Neutrinos</span><span id="stat-neutrino">0</span>
-        </div>
-        <div class="stat-line stat-iron">
-          <span>Iron nuclei</span><span id="stat-iron">0</span>
         </div>
       </div>
-    </div>
-    <div id="miniAxis">
-      <div class="mini-axis-title">Vertical scale</div>
-      <canvas id="axisCanvas" width="150" height="180"></canvas>
-      <div class="mini-axis-medium">Medium: Thin air / upper atmosphere</div>
-    </div>
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
-          "three/": "https://cdn.jsdelivr.net/npm/three@0.152.2/"
-        }
+
+      <div class="control-group">
+        <label>Injection Energy <span class="val" id="energyValue">3.0</span> TeV</label>
+        <input id="energyRange" type="range" min="0.8" max="16.0" step="0.1" value="3.0" />
+      </div>
+
+      <div class="control-group">
+        <label>Scatter Drive <span class="val" id="driveValue">2.40</span></label>
+        <input id="driveRange" type="range" min="0.3" max="300.0" step="0.05" value="2.4" />
+      </div>
+
+      <div class="panel-header">Config // Simulation</div>
+
+      <div class="control-group">
+        <label>Flux Rate <span class="val" id="rateValue">0.7</span>/s</label>
+        <input id="rateRange" type="range" min="0.1" max="8.0" step="0.1" value="0.7" />
+      </div>
+
+      <div class="switch-row">
+        <span>Auto-Cascade</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="cascadeToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="switch-row">
+        <span>Ground Strikes</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="hitToggle" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="action-buttons">
+        <button id="burstButton" class="btn-danger">INJECT SINGLE</button>
+        <button id="clearButton" class="btn-secondary">PURGE SKY</button>
+        <button id="clearHits" class="btn-secondary">CLR HITS</button>
+      </div>
+    </aside>
+
+    <div class="hud-center"></div>
+
+    <aside class="hud-panel right-panel">
+      <div class="panel-header">Telemetry // Live</div>
+      <div id="statsGrid">
+        <div class="stat-box">
+          <label>Active</label>
+          <span id="particleCount">0</span>
+        </div>
+        <div class="stat-box highlight">
+          <label>Muons</label>
+          <span id="stat-muon">0</span>
+        </div>
+        <div class="stat-box">
+          <label>Gammas</label>
+          <span id="stat-gamma">0</span>
+        </div>
+        <div class="stat-box">
+          <label>Electrons</label>
+          <span id="stat-electron">0</span>
+        </div>
+        <div class="stat-box warning">
+          <label>Hadrons</label>
+          <span id="stat-hadrons">0</span>
+        </div>
+      </div>
+
+      <div class="panel-header">Detection Log</div>
+      <div id="consoleLog" class="console-output">
+        <div class="log-line">>> INITIALIZING SENSORS...</div>
+        <div class="log-line">>> CALIBRATING DETECTORS...</div>
+        <div class="log-line">>> SYSTEM READY.</div>
+      </div>
+
+      <div class="panel-header">Atmosphere Depth</div>
+      <div class="canvas-container">
+        <canvas id="axisCanvas" width="280" height="180"></canvas>
+        <div class="axis-labels">
+          <span>80km</span>
+          <span>40km</span>
+          <span>0km</span>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"
       }
-    </script>
-    <script type="module" src="app.js"></script>
-  </body>
+    }
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
 </html>

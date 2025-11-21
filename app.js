@@ -1,16 +1,15 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+// Scene setup (keeps the new aesthetic but uses proven simulation logic)
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x090a14);
-scene.fog = new THREE.FogExp2(0x030347, 0.003);
+scene.background = new THREE.Color(0x020204);
+scene.fog = new THREE.FogExp2(0x020204, 0.004);
 
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 420);
-camera.far = 5000;
-camera.position.set(0, 22, 90);
-camera.updateProjectionMatrix();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 4000);
+camera.position.set(0, 35, 140);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -19,35 +18,30 @@ document.body.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.minDistance = 15;
-controls.maxDistance = 160;
-controls.maxPolarAngle = Math.PI / 2.2;
-controls.target.set(0, 8, 0);
+controls.minDistance = 20;
+controls.maxDistance = 300;
+controls.target.set(0, 20, 0);
 
-const ambient = new THREE.AmbientLight(0x344769, 0.9);
+const ambient = new THREE.AmbientLight(0x344769, 1.4);
 scene.add(ambient);
 
-const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-sun.position.set(28, 60, 22);
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+sun.position.set(20, 80, 50);
 scene.add(sun);
 
-const grid = new THREE.GridHelper(260, 36, 0x0a1230, 0x051015);
-grid.position.y = -12;
+const grid = new THREE.GridHelper(400, 40, 0x440000, 0x111111);
+grid.position.y = -20;
 scene.add(grid);
 
 const ground = new THREE.Mesh(
   new THREE.CircleGeometry(4000, 64),
-  new THREE.MeshBasicMaterial({
-    color: 0x050a16,
-    transparent: true,
-    opacity: 0.3,
-    side: THREE.DoubleSide,
-  }),
+  new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5, side: THREE.DoubleSide }),
 );
 ground.rotateX(-Math.PI / 2);
-ground.position.y = -13.5;
+ground.position.y = -20.1;
 scene.add(ground);
 
+// Palettes and lifetimes (extends the original with new particle species)
 const typePalette = {
   proton: 0xffc26f,
   gamma: 0x7ef9ff,
@@ -57,6 +51,8 @@ const typePalette = {
   positron: 0xffa3ff,
   neutrino: 0x7a7a7a,
   iron: 0xffd97d,
+  tau: 0x88ff00,
+  antiproton: 0xb070ff,
 };
 
 const paletteCache = {};
@@ -73,6 +69,8 @@ const lifetimeMap = {
   positron: 1.4,
   neutrino: 0.6,
   iron: 6,
+  tau: 0.5,
+  antiproton: 6,
 };
 
 class Particle {
@@ -95,39 +93,36 @@ class Particle {
   }
 
   shouldExpire() {
-    return (
-      this.position.y < -18 ||
-      this.age > lifetimeMap[this.type] ||
-      this.energy < 0.0005  //arbitrary, so keep very low
-    );
+    return this.position.y < -20 || this.age > lifetimeMap[this.type] || this.energy < 0.0005;
   }
 }
 
-const maxParticles = 256000;
+// Buffers
+const maxParticles = 20000;
 const particles = [];
 const positions = new Float32Array(maxParticles * 3);
 const colors = new Float32Array(maxParticles * 3);
 const energies = new Float32Array(maxParticles);
 
-const maxHits = 80000;
+const maxHits = 16000;
 const hitPositions = new Float32Array(maxHits * 3);
 const hitColors = new Float32Array(maxHits * 3);
+const hitEnergies = new Float32Array(maxHits);
 
+// Geometry
 const particleGeometry = new THREE.BufferGeometry();
-particleGeometry.setAttribute(
-  "position",
-  new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage),
-);
-particleGeometry.setAttribute(
-  "color",
-  new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage),
-);
+particleGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+particleGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage));
+particleGeometry.setAttribute("energy", new THREE.BufferAttribute(energies, 1).setUsage(THREE.DynamicDrawUsage));
 particleGeometry.setDrawRange(0, 0);
-particleGeometry.setAttribute(
-  "energy",
-  new THREE.BufferAttribute(energies, 1).setUsage(THREE.DynamicDrawUsage),
-);
 
+const hitGeometry = new THREE.BufferGeometry();
+hitGeometry.setAttribute("position", new THREE.BufferAttribute(hitPositions, 3).setUsage(THREE.DynamicDrawUsage));
+hitGeometry.setAttribute("color", new THREE.BufferAttribute(hitColors, 3).setUsage(THREE.DynamicDrawUsage));
+hitGeometry.setAttribute("energy", new THREE.BufferAttribute(hitEnergies, 1).setUsage(THREE.DynamicDrawUsage));
+hitGeometry.setDrawRange(0, 0);
+
+// Point sprite
 const spriteCanvas = document.createElement("canvas");
 spriteCanvas.width = spriteCanvas.height = 64;
 const spriteCtx = spriteCanvas.getContext("2d");
@@ -145,10 +140,7 @@ particleTexture.generateMipmaps = false;
 particleTexture.needsUpdate = true;
 
 const particleMaterial = new THREE.ShaderMaterial({
-  uniforms: {
-    pointTexture: { value: particleTexture },
-    size: { value: 3 },
-  },
+  uniforms: { pointTexture: { value: particleTexture }, size: { value: 3 } },
   vertexShader: `
     uniform float size;
     attribute float energy;
@@ -181,25 +173,8 @@ const particleMaterial = new THREE.ShaderMaterial({
   vertexColors: true,
 });
 
-const pointCloud = new THREE.Points(particleGeometry, particleMaterial);
-scene.add(pointCloud);
-
-const hitGeometry = new THREE.BufferGeometry();
-hitGeometry.setAttribute(
-  "position",
-  new THREE.BufferAttribute(hitPositions, 3).setUsage(THREE.DynamicDrawUsage),
-);
-hitGeometry.setAttribute(
-  "color",
-  new THREE.BufferAttribute(hitColors, 3).setUsage(THREE.DynamicDrawUsage),
-);
-hitGeometry.setDrawRange(0, 0);
-
 const hitMaterial = new THREE.ShaderMaterial({
-  uniforms: {
-    pointTexture: { value: particleTexture },
-    size: { value: 4 },
-  },
+  uniforms: { pointTexture: { value: particleTexture }, size: { value: 4 } },
   vertexShader: `
     uniform float size;
     attribute float energy;
@@ -231,13 +206,13 @@ const hitMaterial = new THREE.ShaderMaterial({
   blending: THREE.AdditiveBlending,
   vertexColors: true,
 });
+
+const pointCloud = new THREE.Points(particleGeometry, particleMaterial);
+scene.add(pointCloud);
 const hitCloud = new THREE.Points(hitGeometry, hitMaterial);
 scene.add(hitCloud);
 
-const clock = new THREE.Clock();
-let spawnAccumulator = 0;
-
-const pauseButton = document.getElementById("pauseButton");
+// UI references
 const primaryTypeSelect = document.getElementById("primaryType");
 const energyRange = document.getElementById("energyRange");
 const driveRange = document.getElementById("driveRange");
@@ -248,56 +223,47 @@ const rateValue = document.getElementById("rateValue");
 const burstButton = document.getElementById("burstButton");
 const clearButton = document.getElementById("clearButton");
 const hitToggle = document.getElementById("hitToggle");
-const hitLabel = document.getElementById("hitLabel");
 const clearHitsButton = document.getElementById("clearHits");
+const cascadeToggle = document.getElementById("cascadeToggle");
+const logElement = document.getElementById("consoleLog");
+const sysTime = document.getElementById("sysTime");
 const axisCanvas = document.getElementById("axisCanvas");
 const axisCtx = axisCanvas?.getContext("2d");
-const cascadeToggle = document.getElementById("cascadeToggle");
-const cascadeLabel = document.getElementById("cascadeLabel");
-const infoToggle = document.getElementById("infoToggle");
-const overlayDescription = document.getElementById("overlayDescription");
 
 const statsElements = {
-  proton: document.getElementById("stat-proton"),
-  gamma: document.getElementById("stat-gamma"),
-  pion: document.getElementById("stat-pion"),
   muon: document.getElementById("stat-muon"),
+  gamma: document.getElementById("stat-gamma"),
   electron: document.getElementById("stat-electron"),
-  positron: document.getElementById("stat-positron"),
-  neutrino: document.getElementById("stat-neutrino"),
-  iron: document.getElementById("stat-iron"),
+  hadrons: document.getElementById("stat-hadrons"),
+  count: document.getElementById("particleCount"),
 };
 
-const particleCountElement = document.getElementById("particleCount");
+// Simulation state
+const clock = new THREE.Clock();
+let spawnAccumulator = 0;
 let hitsActive = true;
 let hitCount = 0;
-let descriptionVisible = true;
-
-function createParticle(type, origin, energy, options = {}) {
-  const scatter = options.scatter ?? 0.45;
-  const upwardBias = options.upwardBias ?? 0;
-  const baseSpeed = options.speed ?? 16;
-  
-  // Lateral spread increases with depth (Molière radius)
-  const depth = (80 - origin.y) / 80; // 0 at top, 1 at ground
-  const lateralSpread = scatter * (1 + depth * 2); // Widens as it descends
-  
-  const direction = new THREE.Vector3(
-    (Math.random() - 0.5) * lateralSpread,
-    -1 + upwardBias,
-    (Math.random() - 0.5) * lateralSpread,
-  ).normalize();
-  
-  const speed = baseSpeed + energy * 5;
-  const velocity = direction.multiplyScalar(speed);
-  const position = origin.clone();
-  return new Particle(type, position, velocity, Math.max(energy, 0.08));
-}
+let cascadeActive = false;
 
 function brightnessFactor(energy) {
   const primaryEnergy = Math.max(parseFloat(energyRange.value) || 1, 0.5);
   const ratio = Math.min(energy / primaryEnergy, 1);
   return THREE.MathUtils.clamp(0.35 + 0.65 * ratio, 0.35, 1);
+}
+
+function createParticle(type, origin, energy, options = {}) {
+  const scatter = options.scatter ?? 0.45;
+  const upwardBias = options.upwardBias ?? 0;
+  const baseSpeed = options.speed ?? 16;
+  const direction = new THREE.Vector3(
+    (Math.random() - 0.5) * scatter,
+    -1 + upwardBias,
+    (Math.random() - 0.5) * scatter,
+  ).normalize();
+  const speed = baseSpeed + energy * 5;
+  const velocity = direction.multiplyScalar(speed);
+  const position = origin.clone();
+  return new Particle(type, position, velocity, Math.max(energy, 0.08));
 }
 
 function createPair(parent, typeA, typeB) {
@@ -316,11 +282,23 @@ function createPair(parent, typeA, typeB) {
   ];
 }
 
+function logEvent(msg) {
+  if (!logElement) return;
+  const line = document.createElement("div");
+  line.className = "log-line";
+  line.innerHTML = `>> ${msg}`;
+  logElement.prepend(line);
+  while (logElement.children.length > 14) {
+    logElement.lastChild?.remove();
+  }
+}
+
 function recordHit(particle) {
   if (!hitsActive) return;
   if (hitCount >= maxHits) {
     hitPositions.copyWithin(0, 3);
     hitColors.copyWithin(0, 3);
+    hitEnergies.copyWithin(0, 1);
     hitCount = maxHits - 1;
   }
   const baseIdx = hitCount * 3;
@@ -332,178 +310,111 @@ function recordHit(particle) {
   hitColors[baseIdx] = palette.r * bright;
   hitColors[baseIdx + 1] = palette.g * bright;
   hitColors[baseIdx + 2] = palette.b * bright;
+  hitEnergies[hitCount] = bright;
   hitCount += 1;
   hitGeometry.setDrawRange(0, hitCount);
   hitGeometry.attributes.position.needsUpdate = true;
   hitGeometry.attributes.color.needsUpdate = true;
+  hitGeometry.attributes.energy.needsUpdate = true;
 }
 
-
-function spawnPrimary(type) {
-  const energy = parseFloat(energyRange.value);
+function spawnPrimary(type = primaryTypeSelect?.value || "proton") {
+  const energy = parseFloat(energyRange?.value || "1");
   const altitude = 70 + (Math.random() - 0.5) * 6;
-  const origin = new THREE.Vector3(
-    (Math.random() - 0.5) * 10,
-    altitude,
-    (Math.random() - 0.5) * 10,
-  );
-  const opts = {
-    scatter: type === "gamma" ? 0.08 : 0.2,
-    speed: type === "gamma" ? 24 : 18,
-  };
-  if (type === "iron") {
-    opts.scatter = 0.25;
-    opts.speed = 20;
+  const origin = new THREE.Vector3((Math.random() - 0.5) * 10, altitude, (Math.random() - 0.5) * 10);
+  const opts = { scatter: 0.2, speed: 18 };
+  let energyScale = 1;
+
+  switch (type) {
+    case "gamma":
+      opts.scatter = 0.08;
+      opts.speed = 24;
+      break;
+    case "iron":
+      opts.scatter = 0.25;
+      opts.speed = 20;
+      energyScale = 1.3;
+      break;
+    case "tau":
+      opts.scatter = 0.18;
+      opts.speed = 22;
+      break;
+    case "antiproton":
+      opts.scatter = 0.22;
+      opts.speed = 18;
+      break;
+    default:
+      break;
   }
-  const primary = createParticle(type, origin, energy * (type === "iron" ? 1.3 : 1), opts);
+
+  const primary = createParticle(type, origin, energy * energyScale, opts);
   particles.push(primary);
+
+  if (!cascadeActive) {
+    const palette = paletteCache[type] || paletteCache.proton;
+    const color = `#${palette.getHexString()}`;
+    logEvent(`<span style="color:${color}">DETECTED: ${type.toUpperCase()} @ ${energy.toFixed(1)} TeV</span>`);
+  }
 }
-
-// pause setup
-let isPaused = false;
-pauseButton.addEventListener("click", () => {
-  isPaused = !isPaused;  // Flip it: true→false or false→true
-  pauseButton.textContent = isPaused ? "▶ Play" : "⏸ Pause";  // Icon + text
-});
-
-burstButton.addEventListener("click", () => spawnPrimary(primaryTypeSelect.value));
-let cascadeActive = false;
-cascadeToggle.addEventListener("change", () => {
-  cascadeActive = cascadeToggle.checked;
-  cascadeLabel.textContent = cascadeActive ? "on" : "off";
-  if (cascadeActive) {
-    spawnAccumulator = 0;
-    spawnPrimary(primaryTypeSelect.value);
-  }
-});
-hitToggle.addEventListener("change", () => {
-  hitsActive = hitToggle.checked;
-  hitLabel.textContent = hitsActive ? "on" : "off";
-});
-clearHitsButton.addEventListener("click", () => {
-  hitCount = 0;
-  hitGeometry.setDrawRange(0, 0);
-  hitGeometry.attributes.position.needsUpdate = true;
-  hitGeometry.attributes.color.needsUpdate = true;
-});
-clearButton.addEventListener("click", () => {
-  particles.length = 0;
-});
-
-energyRange.addEventListener("input", () => {
-  energyValue.textContent = parseFloat(energyRange.value).toFixed(1);
-});
-driveRange.addEventListener("input", () => {
-  driveValue.textContent = parseFloat(driveRange.value).toFixed(2);
-});
-rateRange.addEventListener("input", () => {
-  rateValue.textContent = parseFloat(rateRange.value).toFixed(2);
-});
-
-infoToggle?.addEventListener("click", () => {
-  descriptionVisible = !descriptionVisible;
-  if (overlayDescription) {
-    overlayDescription.classList.toggle("collapsed", !descriptionVisible);
-  }
-  infoToggle.textContent = descriptionVisible ? "Hide intro" : "Show intro";
-  infoToggle.setAttribute("aria-expanded", descriptionVisible ? "true" : "false");
-});
-
-window.addEventListener("keydown", (event) => {
-  // Spacebar toggles pause
-  if (event.code === "Space" || event.key === " ") {
-    event.preventDefault(); // Prevent page scroll
-    isPaused = !isPaused;
-    if (pauseButton) {
-      pauseButton.textContent = isPaused ? "▶ Play" : "⏸ Pause";
-    }
-  } else if (event.key === "r" || event.key === "R" ) {
-    // Clear all on r
-    particles.length = 0;
-    hitCount = 0;
-    hitGeometry.setDrawRange(0, 0);
-    hitGeometry.attributes.position.needsUpdate = true;
-    hitGeometry.attributes.color.needsUpdate = true;
-  }
-});
 
 function trimParticles() {
   if (particles.length <= maxParticles) return;
   particles.splice(0, particles.length - maxParticles);
 }
 
-function maybeBranch(particle, collector) {
+function maybeBranch(particle, collector, delta) {
   const drive = parseFloat(driveRange.value);
+  const baseProbability = 0.02 * drive + 0.015 * Math.min(particle.energy, 3);
+  const chance = Math.min(1, baseProbability * delta);
+  if (Math.random() > chance) return;
 
-  const energyMultiplier = {
-    proton: 1.0 * (drive/5.0),
-    iron: 2.0 * (drive/5.0),
-    gamma: 15.0 * (Math.pow(drive, 0.2)/5.0),       // ← Gammas are more sensitive to energy
-    electron: 2.0 * (drive/5.0),
-    positron: 2.0 * (drive/5.0),
-    pion: 0.9 * (drive/5.0),
-    muon: 0.5 * (drive/5.0),        // ← Muons barely respond to energy
-    neutrino: 0.1 * (drive/5.0)
-  };
-  
-  const mult = energyMultiplier[particle.type] || 1.0;
-  const baseProbability = 0.02 * drive + mult * 0.02 * Math.min(particle.energy, 8.0);
-
-  if (Math.random() > baseProbability) return;
   const heightModifier = Math.max(0, Math.min(1, (particle.position.y + 20) / 90));
   if (Math.random() > 0.7 + 0.3 * heightModifier) return;
-  
 
-  // Electromagnetic shower suppression at low altitude
-  const altitudeFactor = Math.max(0, (particle.position.y + 10) / 80);
-  
   switch (particle.type) {
-    case "proton": {
+    case "proton":
+    case "antiproton":
+    case "iron": {
       if (particle.age < 0.2) return;
-      // Proton produces mainly pions
       collector.push(createParticle("pion", particle.position, particle.energy * 0.7, { scatter: 0.4 }));
-      collector.push(createParticle("pion", particle.position, particle.energy * 0.6, { scatter: 0.5 }));
       collector.push(createParticle("pion", particle.position, particle.energy * 0.45, { scatter: 0.65 }));
-      // Fewer gammas from protons
-      if (Math.random() < 0.1) {
+      if (Math.random() < 0.5) {
         collector.push(...createPair(particle, "gamma", "gamma"));
       }
-      break;
-    }
-    case "iron": {
-      if (particle.age < 0.15) return;
-      // Iron fragments create a MUCH wider shower
-      const fragments = 3 + Math.floor(Math.random() * 3);
-      for (let i = 0; i < fragments; i++) {
-        collector.push(createParticle("pion", particle.position, particle.energy * 0.5, { scatter: 1.2 }));
+      if (particle.type === "iron" && Math.random() < 0.4) {
+        collector.push(createParticle("muon", particle.position, particle.energy * 0.4, { scatter: 0.5, speed: 20 }));
       }
-      // Iron produces more muons
-      if (Math.random() < 0.7) {
-        collector.push(createParticle("muon", particle.position, particle.energy * 0.5, { scatter: 0.8, speed: 20 }));
-        collector.push(createParticle("muon", particle.position, particle.energy * 0.4, { scatter: 0.9, speed: 18 }));
-      }
-      // Some proton fragments
-      if (Math.random() < 0.5) {
-        collector.push(createParticle("proton", particle.position, particle.energy * 0.4, { scatter: 0.9 }));
+      if (particle.type === "antiproton" && Math.random() < 0.35) {
+        collector.push(createParticle("gamma", particle.position, particle.energy * 0.5, { scatter: 0.5, speed: 22 }));
       }
       break;
     }
     case "gamma": {
-      // Suppress electromagnetic cascade at low altitude
-      const emProb = 0.25 * altitudeFactor;
-      if (Math.random() < emProb) {
+      if (Math.random() < 0.55) {
         collector.push(...createPair(particle, "electron", "positron"));
       }
       break;
     }
     case "pion": {
-      if (Math.random() < 0.85) {
+      if (Math.random() < 0.65) {
         collector.push(
           createParticle("muon", particle.position, particle.energy * 0.7, { scatter: 0.25, speed: 19 }),
         );
         collector.push(
-          createParticle("neutrino", particle.position, particle.energy * 0.2, { scatter: 0.4, upwardBias: 0.4, speed: 16 }),
+          createParticle("neutrino", particle.position, particle.energy * 0.2, {
+            scatter: 0.4,
+            upwardBias: 0.3,
+            speed: 16,
+          }),
         );
+      }
+      break;
+    }
+    case "tau": {
+      if (particle.age > 0.05) {
+        collector.push(createParticle("muon", particle.position, particle.energy * 0.6, { scatter: 0.3, speed: 20 }));
+        collector.push(createParticle("neutrino", particle.position, particle.energy * 0.25, { scatter: 0.6, speed: 18 }));
+        collector.push(createParticle("pion", particle.position, particle.energy * 0.35, { scatter: 0.6, speed: 18 }));
       }
       break;
     }
@@ -513,18 +424,21 @@ function maybeBranch(particle, collector) {
           createParticle("electron", particle.position, particle.energy * 0.5, { scatter: 0.35, speed: 14 }),
         );
         collector.push(
-          //nearly isotropic
-          createParticle("neutrino", particle.position, particle.energy * 0.15, { scatter: 0.5, upwardBias: Math.random() * 1.4 - 0.2, speed: 16 }),
+          createParticle("neutrino", particle.position, particle.energy * 0.15, {
+            scatter: 0.5,
+            upwardBias: 0.3,
+            speed: 16,
+          }),
         );
       }
       break;
     }
     case "electron":
     case "positron": {
-      // Strongly suppress at low altitude
-      const emProb = 0.18 * altitudeFactor;
-      if (Math.random() < emProb) {
-        collector.push(createParticle("gamma", particle.position, particle.energy * 0.3, { scatter: 0.6, upwardBias: 0.1 }));
+      if (Math.random() < 0.3) {
+        collector.push(
+          createParticle("gamma", particle.position, particle.energy * 0.3, { scatter: 0.6, upwardBias: 0.1 }),
+        );
       }
       break;
     }
@@ -552,7 +466,7 @@ function updateParticles(delta) {
     particle.update(delta);
     maybeBranch(particle, newParticles, delta);
     const shouldDie = particle.shouldExpire();
-    const hitFloor = particle.position.y < -18;
+    const hitFloor = particle.position.y < ground.position.y + 0.2;
     if (shouldDie) {
       if (hitFloor) {
         recordHit(particle);
@@ -590,37 +504,38 @@ function refreshPointCloud() {
 }
 
 function updateStats() {
-  const counts = {
-    proton: 0,
-    gamma: 0,
-    pion: 0,
-    muon: 0,
-    electron: 0,
-    positron: 0,
-    neutrino: 0,
-    iron: 0,
-  };
+  const counts = { muon: 0, gamma: 0, electron: 0, hadrons: 0 };
   for (const particle of particles) {
-    counts[particle.type] += 1;
-  }
-  for (const type in counts) {
-    if (statsElements[type]) {
-      statsElements[type].textContent = counts[type];
+    if (particle.type === "muon") {
+      counts.muon += 1;
+    } else if (particle.type === "gamma") {
+      counts.gamma += 1;
+    } else if (particle.type === "electron" || particle.type === "positron") {
+      counts.electron += 1;
+    } else if (particle.type === "proton" || particle.type === "pion" || particle.type === "iron" || particle.type === "antiproton") {
+      counts.hadrons += 1;
+    } else if (particle.type === "tau") {
+      counts.hadrons += 1;
     }
   }
-  particleCountElement.textContent = particles.length;
+
+  if (statsElements.muon) statsElements.muon.textContent = counts.muon;
+  if (statsElements.gamma) statsElements.gamma.textContent = counts.gamma;
+  if (statsElements.electron) statsElements.electron.textContent = counts.electron;
+  if (statsElements.hadrons) statsElements.hadrons.textContent = counts.hadrons;
+  if (statsElements.count) statsElements.count.textContent = particles.length;
 }
 
 function drawAxisMini() {
-  if (!axisCtx) return;
+  if (!axisCtx || !axisCanvas) return;
   const width = axisCanvas.width;
   const height = axisCanvas.height;
   axisCtx.clearRect(0, 0, width, height);
-  axisCtx.fillStyle = "rgba(4,7,18,0.96)";
+  axisCtx.fillStyle = "rgba(5,6,12,0.9)";
   axisCtx.fillRect(0, 0, width, height);
 
-  const centerX = width * 0.35;
-  axisCtx.strokeStyle = "rgba(255,255,255,0.45)";
+  const centerX = width * 0.3;
+  axisCtx.strokeStyle = "rgba(255,88,88,0.45)";
   axisCtx.lineWidth = 1;
   axisCtx.beginPath();
   axisCtx.moveTo(centerX, 4);
@@ -629,43 +544,39 @@ function drawAxisMini() {
 
   const ticks = [0, 20, 40, 60, 80];
   axisCtx.fillStyle = "rgba(255,255,255,0.65)";
-  axisCtx.font = "0.55rem 'Space Grotesk', sans-serif";
+  axisCtx.font = "11px 'Share Tech Mono', monospace";
   ticks.forEach((value) => {
-    const normalized = (value + 20) / 100; // map [-20,80] to 0-1
+    const normalized = (value + 20) / 100;
     const y = height - normalized * height;
     axisCtx.beginPath();
     axisCtx.moveTo(centerX, y);
-    axisCtx.lineTo(centerX - 8, y);
+    axisCtx.lineTo(centerX - 10, y);
     axisCtx.stroke();
-    axisCtx.fillText(`${value} km`, centerX + 6, y + 4);
+    axisCtx.fillText(`${value} km`, centerX + 8, y + 4);
   });
 
   let drawn = 0;
-  for (let i = particles.length - 1; i >= 0 && drawn < 80; i -= 1) {
+  for (let i = particles.length - 1; i >= 0 && drawn < 120; i -= 1) {
     const particle = particles[i];
     const palette = paletteCache[particle.type] || paletteCache.proton;
     const bright = brightnessFactor(particle.energy);
     const normX = THREE.MathUtils.clamp((particle.position.x + 25) / 50, 0, 1);
     const normY = THREE.MathUtils.clamp((particle.position.y + 20) / 100, 0, 1);
-    const x = centerX + 6 + normX * (width - centerX - 16);
+    const x = centerX + 6 + normX * (width - centerX - 12);
     const y = height - normY * height;
     const r = Math.round(palette.r * 255 * bright);
     const g = Math.round(palette.g * 255 * bright);
     const b = Math.round(palette.b * 255 * bright);
     axisCtx.fillStyle = `rgba(${r},${g},${b},${0.65 + 0.3 * bright})`;
-    axisCtx.beginPath();
-    axisCtx.arc(x, y, 1.25, 0, Math.PI * 2);
-    axisCtx.fill();
+    axisCtx.fillRect(x, y, 2, 2);
     drawn += 1;
   }
 }
 
 function energizeControls() {
-  energyValue.textContent = parseFloat(energyRange.value).toFixed(1);
-  driveValue.textContent = parseFloat(driveRange.value).toFixed(2);
-  rateValue.textContent = parseFloat(rateRange.value).toFixed(2);
-  cascadeLabel.textContent = cascadeToggle.checked ? "on" : "off";
-  hitLabel.textContent = hitToggle.checked ? "on" : "off";
+  if (energyValue) energyValue.textContent = parseFloat(energyRange.value).toFixed(1);
+  if (driveValue) driveValue.textContent = parseFloat(driveRange.value).toFixed(2);
+  if (rateValue) rateValue.textContent = parseFloat(rateRange.value).toFixed(2);
 }
 
 function onResize() {
@@ -674,23 +585,45 @@ function onResize() {
   camera.updateProjectionMatrix();
 }
 
+burstButton?.addEventListener("click", () => spawnPrimary(primaryTypeSelect.value));
+cascadeToggle?.addEventListener("change", () => {
+  cascadeActive = cascadeToggle.checked;
+  if (cascadeActive) {
+    spawnAccumulator = 0;
+    spawnPrimary(primaryTypeSelect.value);
+  }
+});
+hitToggle?.addEventListener("change", () => {
+  hitsActive = hitToggle.checked;
+});
+clearButton?.addEventListener("click", () => {
+  particles.length = 0;
+});
+clearHitsButton?.addEventListener("click", () => {
+  hitCount = 0;
+  hitGeometry.setDrawRange(0, 0);
+  hitGeometry.attributes.position.needsUpdate = true;
+  hitGeometry.attributes.color.needsUpdate = true;
+  hitGeometry.attributes.energy.needsUpdate = true;
+});
+
+energyRange?.addEventListener("input", () => energyValue && (energyValue.textContent = parseFloat(energyRange.value).toFixed(1)));
+driveRange?.addEventListener("input", () => driveValue && (driveValue.textContent = parseFloat(driveRange.value).toFixed(2)));
+rateRange?.addEventListener("input", () => rateValue && (rateValue.textContent = parseFloat(rateRange.value).toFixed(2)));
+
 window.addEventListener("resize", onResize);
 
 function animate() {
-  // always call or delta accumulate
-  const rawDelta = clock.getDelta();
-  
+  const delta = Math.min(clock.getDelta(), 0.045);
   controls.update();
-  
-  // dont call if paused
-  if (!isPaused) {
-    const delta = Math.min(rawDelta, 0.045);
-    updateParticles(delta);
-  }
-  
+  updateParticles(delta);
   refreshPointCloud();
   updateStats();
   drawAxisMini();
+  if (sysTime) {
+    const now = new Date();
+    sysTime.textContent = now.toLocaleTimeString("en-GB");
+  }
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
