@@ -29,8 +29,12 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.5);
 sun.position.set(20, 80, 50);
 scene.add(sun);
 
-const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent-primary")
-const grid = new THREE.GridHelper(400, 40, accent, 0x111111);
+const rootStyle = document.documentElement.style;
+const rootComputed = getComputedStyle(document.documentElement);
+const accentInitial = new THREE.Color(rootComputed.getPropertyValue("--accent-primary").trim() || "#ff3a3a");
+const accentDimInitial = new THREE.Color(rootComputed.getPropertyValue("--accent-dim").trim() || "#7a1f1f");
+
+const grid = new THREE.GridHelper(400, 40, accentDimInitial, 0x111111);
 grid.position.y = -20;
 scene.add(grid);
 
@@ -59,6 +63,63 @@ const typePalette = {
 const paletteCache = {};
 for (const type in typePalette) {
   paletteCache[type] = new THREE.Color(typePalette[type]);
+}
+
+const accentState = {
+  current: accentInitial.clone(),
+  target: accentInitial.clone(),
+  dimCurrent: accentDimInitial.clone(),
+  dimTarget: accentDimInitial.clone(),
+};
+
+let accentStrokeStyle = colorToRgba(accentState.current, 0.45);
+
+function clampColor(color) {
+  color.r = Math.min(1, Math.max(0, color.r));
+  color.g = Math.min(1, Math.max(0, color.g));
+  color.b = Math.min(1, Math.max(0, color.b));
+  return color;
+}
+
+function colorToHex(color) {
+  return `#${clampColor(color.clone()).getHexString()}`;
+}
+
+function colorToRgba(color, alpha) {
+  const clamped = clampColor(color.clone());
+  const r = Math.round(clamped.r * 255);
+  const g = Math.round(clamped.g * 255);
+  const b = Math.round(clamped.b * 255);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function setAccentTargets(type, snap = false) {
+  const palette = paletteCache[type] || paletteCache.proton;
+  accentState.target.copy(palette);
+  accentState.dimTarget.copy(palette).multiplyScalar(0.45);
+  if (snap) {
+    accentState.current.copy(accentState.target);
+    accentState.dimCurrent.copy(accentState.dimTarget);
+    applyAccentStyles();
+  }
+}
+
+function applyAccentStyles() {
+  accentStrokeStyle = colorToRgba(accentState.current, 0.45);
+  rootStyle.setProperty("--accent-primary", colorToHex(accentState.current));
+  rootStyle.setProperty("--accent-dim", colorToHex(accentState.dimCurrent));
+  if (Array.isArray(grid.material)) {
+    grid.material[0].color.copy(accentState.dimCurrent);
+  } else {
+    grid.material.color.copy(accentState.dimCurrent);
+  }
+}
+
+function updateAccent(delta) {
+  const lerpT = 1 - Math.exp(-6 * delta);
+  accentState.current.lerp(accentState.target, lerpT);
+  accentState.dimCurrent.lerp(accentState.dimTarget, lerpT);
+  applyAccentStyles();
 }
 
 const lifetimeMap = {
@@ -223,6 +284,7 @@ const driveValue = document.getElementById("driveValue");
 const rateValue = document.getElementById("rateValue");
 const burstButton = document.getElementById("burstButton");
 const clearButton = document.getElementById("clearButton");
+const pauseButton = document.getElementById("pauseButton");
 const hitToggle = document.getElementById("hitToggle");
 const clearHitsButton = document.getElementById("clearHits");
 const cascadeToggle = document.getElementById("cascadeToggle");
@@ -245,6 +307,36 @@ let spawnAccumulator = 0;
 let hitsActive = true;
 let hitCount = 0;
 let cascadeActive = false;
+let isPaused = false;
+
+function setPaused(paused) {
+  isPaused = paused;
+  if (pauseButton) {
+    pauseButton.textContent = isPaused ? "RESUME" : "PAUSE";
+    pauseButton.classList.toggle("btn-danger", isPaused);
+  }
+}
+
+function togglePause() {
+  setPaused(!isPaused);
+}
+
+function clearSky() {
+  particles.length = 0;
+}
+
+function clearHits() {
+  hitCount = 0;
+  hitGeometry.setDrawRange(0, 0);
+  hitGeometry.attributes.position.needsUpdate = true;
+  hitGeometry.attributes.color.needsUpdate = true;
+  hitGeometry.attributes.energy.needsUpdate = true;
+}
+
+function clearAll() {
+  clearSky();
+  clearHits();
+}
 
 function brightnessFactor(energy) {
   const primaryEnergy = Math.max(parseFloat(energyRange.value) || 1, 0.5);
@@ -536,7 +628,7 @@ function drawAxisMini() {
   axisCtx.fillRect(0, 0, width, height);
 
   const centerX = width * 0.3;
-  axisCtx.strokeStyle = accent;
+  axisCtx.strokeStyle = accentStrokeStyle;
   axisCtx.lineWidth = 1;
   axisCtx.beginPath();
   axisCtx.moveTo(centerX, 4);
@@ -597,27 +689,45 @@ cascadeToggle?.addEventListener("change", () => {
 hitToggle?.addEventListener("change", () => {
   hitsActive = hitToggle.checked;
 });
-clearButton?.addEventListener("click", () => {
-  particles.length = 0;
-});
-clearHitsButton?.addEventListener("click", () => {
-  hitCount = 0;
-  hitGeometry.setDrawRange(0, 0);
-  hitGeometry.attributes.position.needsUpdate = true;
-  hitGeometry.attributes.color.needsUpdate = true;
-  hitGeometry.attributes.energy.needsUpdate = true;
-});
+clearButton?.addEventListener("click", clearSky);
+pauseButton?.addEventListener("click", togglePause);
+clearHitsButton?.addEventListener("click", clearHits);
+primaryTypeSelect?.addEventListener("change", () => setAccentTargets(primaryTypeSelect.value));
 
 energyRange?.addEventListener("input", () => energyValue && (energyValue.textContent = parseFloat(energyRange.value).toFixed(1)));
 driveRange?.addEventListener("input", () => driveValue && (driveValue.textContent = parseFloat(driveRange.value).toFixed(2)));
 rateRange?.addEventListener("input", () => rateValue && (rateValue.textContent = parseFloat(rateRange.value).toFixed(2)));
 
 window.addEventListener("resize", onResize);
+window.addEventListener("keydown", (event) => {
+  const tag = event.target instanceof HTMLElement ? event.target.tagName.toLowerCase() : "";
+  const interactingWithInput = tag === "input" || tag === "select" || tag === "textarea";
+  if (event.code === "Space") {
+    if (!interactingWithInput) {
+      event.preventDefault();
+      togglePause();
+    }
+    return;
+  }
+  const key = event.key.toLowerCase();
+  if (interactingWithInput) return;
+  if (key === "r") {
+    event.preventDefault();
+    clearAll();
+  } else if (key === "f") {
+    event.preventDefault();
+    spawnPrimary(primaryTypeSelect?.value || "proton");
+  }
+});
 
 function animate() {
-  const delta = Math.min(clock.getDelta(), 0.045);
+  const rawDelta = clock.getDelta();
+  updateAccent(rawDelta);
   controls.update();
-  updateParticles(delta);
+  if (!isPaused) {
+    const delta = Math.min(rawDelta, 0.045);
+    updateParticles(delta);
+  }
   refreshPointCloud();
   updateStats();
   drawAxisMini();
@@ -629,5 +739,7 @@ function animate() {
   requestAnimationFrame(animate);
 }
 
+setAccentTargets(primaryTypeSelect?.value || "proton", true);
+setPaused(false);
 energizeControls();
 animate();
